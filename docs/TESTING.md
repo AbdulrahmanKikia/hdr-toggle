@@ -6,7 +6,7 @@ the Windows shell, and the registry, so it is tested by hand with the checklist 
 ## Before you start
 
 ```powershell
-cd hdr_toggle
+cd hdr-toggle                  # the repository root
 cargo build --release
 cargo clippy --all-targets      # expect: no warnings
 Stop-Process -Name hdr_toggle -ErrorAction SilentlyContinue   # make sure no copy is running

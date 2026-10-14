@@ -62,9 +62,11 @@ Tested with Rust 1.99.0 stable. Crate versions are pinned exactly in `Cargo.toml
 
 ## Building
 
-From the `hdr_toggle` folder:
+From the repository root:
 
 ```powershell
+git clone https://github.com/AbdulrahmanKikia/hdr-toggle.git
+cd hdr-toggle
 cargo build --release
 ```
 
@@ -265,7 +267,7 @@ The app is running and locks its exe. Quit it from the tray first, or run
 ## Project layout
 
 ```
-hdr_toggle/
+.
 ├── Cargo.toml          # dependencies (exact pins) and windows-rs features
 ├── Cargo.lock
 ├── README.md           # this file
