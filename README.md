@@ -7,7 +7,8 @@ A small Windows 11 system tray utility that toggles HDR on the primary display w
 - The icon shows the current state: **green** = HDR on, **gray** = HDR off.
 - Hovering shows a tooltip: "HDR on" / "HDR off".
 
-No external image files, no installer, no background services. One ~650 KB executable.
+No external image files, no background services. One ~650 KB executable, with an optional
+per-user installer.
 
 Further reading:
 
@@ -18,17 +19,42 @@ Further reading:
 
 ## Contents
 
-1. [Requirements](#requirements)
-2. [Building](#building)
-3. [Running](#running)
-4. [Using the tray icon](#using-the-tray-icon)
-5. [Start with Windows](#start-with-windows)
-6. [How HDR is switched](#how-hdr-is-switched)
-7. [Logs](#logs)
-8. [Troubleshooting](#troubleshooting)
-9. [Known limitations](#known-limitations)
-10. [Uninstalling](#uninstalling)
-11. [Project layout](#project-layout)
+1. [Installing](#installing)
+2. [Requirements](#requirements)
+3. [Building](#building)
+4. [Running](#running)
+5. [Using the tray icon](#using-the-tray-icon)
+6. [Start with Windows](#start-with-windows)
+7. [How HDR is switched](#how-hdr-is-switched)
+8. [Logs](#logs)
+9. [Troubleshooting](#troubleshooting)
+10. [Known limitations](#known-limitations)
+11. [Uninstalling](#uninstalling)
+12. [Releasing](#releasing)
+13. [Project layout](#project-layout)
+
+---
+
+## Installing
+
+1. Download `hdr_toggle-x.y.z-setup.exe` from the
+   [Releases page](https://github.com/AbdulrahmanKikia/hdr-toggle/releases/latest).
+2. Run it. No admin rights are needed: it installs for the current user only, into
+   `%LOCALAPPDATA%\Programs\hdr_toggle`.
+3. Choose the options you want:
+   - **Start HDR Toggle when I sign in to Windows** (ticked by default). This is the same
+     setting as *Start with Windows* in the tray menu.
+   - **Create a desktop shortcut** (unticked by default).
+4. Leave *Launch HDR Toggle* ticked on the last page to start it straight away.
+
+The installer adds a Start Menu shortcut and an entry under *Settings > Apps > Installed apps*.
+To upgrade, run the setup for the newer version. It closes the running app, replaces the exe,
+and keeps your choices.
+
+> The installer isn't code-signed, so Windows SmartScreen may show *"Windows protected your
+> PC"*. Click **More info > Run anyway**.
+
+To build from source instead, read on.
 
 ---
 
@@ -105,7 +131,8 @@ next to the clock). To keep it visible, drag it onto the taskbar, or enable it u
 ### Installing to a permanent location (recommended)
 
 `target\release` is a build folder. `cargo clean` deletes it, and a rebuild can't overwrite
-the exe while the app is running. For everyday use, copy the exe somewhere stable:
+the exe while the app is running. For everyday use, use the [installer](#installing), or
+copy the exe somewhere stable:
 
 ```powershell
 $dest = "$env:LOCALAPPDATA\Programs\hdr_toggle"
@@ -259,10 +286,46 @@ The app is running and locks its exe. Quit it from the tray first, or run
 
 ## Uninstalling
 
+**If you used the installer:** uninstall *HDR Toggle* from *Settings > Apps > Installed apps*.
+This closes the app and removes the exe, the shortcuts, the `HDRToggle` Run value, and the
+log folder.
+
+**If you built or copied the exe yourself:**
+
 1. Untick *Start with Windows* (or delete the `HDRToggle` value under the Run key).
 2. Choose *Quit* from the tray menu.
 3. Delete the exe (and its folder, if you copied it to `%LOCALAPPDATA%\Programs\hdr_toggle`).
 4. Optionally delete the logs: `Remove-Item -Recurse "$env:LOCALAPPDATA\hdr_toggle"`.
+
+## Releasing
+
+The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from
+`installer\hdr_toggle.iss`.
+
+**Build it locally:**
+
+```powershell
+winget install JRSoftware.InnoSetup    # once
+.\installer\build.ps1
+```
+
+This runs `cargo build --release --locked` and writes
+`installer\Output\hdr_toggle-<version>-setup.exe`, using the version from `Cargo.toml`.
+
+**Publish a release:**
+
+1. Bump `version` in `Cargo.toml` (and run `cargo build` so `Cargo.lock` picks it up), then commit.
+2. Tag and push:
+
+   ```powershell
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+The [Release workflow](.github/workflows/release.yml) builds the installer on GitHub Actions
+and attaches it to a new GitHub Release. It fails if the tag doesn't match the `Cargo.toml`
+version. You can also run the workflow manually from the *Actions* tab to get the installer
+as a build artifact without publishing a release.
 
 ## Project layout
 
@@ -271,9 +334,14 @@ The app is running and locks its exe. Quit it from the tray first, or run
 ├── Cargo.toml          # dependencies (exact pins) and windows-rs features
 ├── Cargo.lock
 ├── README.md           # this file
+├── .github/workflows/
+│   └── release.yml     # builds the installer and publishes GitHub Releases on v* tags
 ├── docs/
 │   ├── ARCHITECTURE.md # internals
 │   └── TESTING.md      # manual test checklist
+├── installer/
+│   ├── hdr_toggle.iss  # Inno Setup script (per-user installer)
+│   └── build.ps1       # builds the exe and the installer
 └── src/
     ├── main.rs         # event loop, tray + menu, single instance, logging
     ├── hdr.rs          # HDR query/set (DisplayConfig) + Win+Alt+B fallback

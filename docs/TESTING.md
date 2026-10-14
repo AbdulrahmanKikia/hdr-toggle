@@ -96,6 +96,53 @@ $p = Start-Process $exe -PassThru; Start-Sleep 2
 | --- | --- |
 | `Get-Content $log` | Missing or empty after a normal session. Any lines start with a UTC timestamp `[YYYY-MM-DD HH:MM:SS UTC]`. |
 
+## Testing the installer
+
+Build it with `.\installer\build.ps1` (needs Inno Setup 6), then run
+`installer\Output\hdr_toggle-<version>-setup.exe` as a **non-admin** user.
+
+```powershell
+$run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+$app = "$env:LOCALAPPDATA\Programs\hdr_toggle"
+```
+
+### Fresh install
+
+| Step | Expected |
+| --- | --- |
+| Run the setup | No UAC prompt. The wizard offers *Start ... when I sign in* (ticked) and *Create a desktop shortcut* (unticked). |
+| Finish with *Launch HDR Toggle* ticked | The tray icon appears. |
+| `Test-Path "$app\hdr_toggle.exe"` | `True` |
+| Start Menu | Has an *HDR Toggle* shortcut that launches the app. |
+| `(Get-ItemProperty $run).HDRToggle` | `"C:\Users\<you>\AppData\Local\Programs\hdr_toggle\hdr_toggle.exe"` (quoted). |
+| Right-click the tray icon | *Start with Windows* is **ticked**. |
+| *Settings > Apps > Installed apps* | Lists *HDR Toggle* with the right version. |
+
+### Autostart task off
+
+| Step | Expected |
+| --- | --- |
+| Re-run the setup and untick *Start ... when I sign in* | Setup completes. |
+| `(Get-ItemProperty $run).HDRToggle` | Empty (value removed). |
+| Right-click the tray icon | *Start with Windows* is unticked. |
+
+### Upgrade while running
+
+| Step | Expected |
+| --- | --- |
+| With the app running, run the setup again (or a newer version) | No "files in use" error. The old instance is closed and the exe is replaced. |
+| `(Get-Process hdr_toggle).Count` after finishing with *Launch* ticked | `1` |
+
+### Uninstall
+
+| Step | Expected |
+| --- | --- |
+| Tick *Start with Windows* from the tray, then uninstall from *Installed apps* | The app closes and the tray icon disappears (hover if a stale icon remains). |
+| `Test-Path $app` | `False` |
+| `(Get-ItemProperty $run).HDRToggle` | Empty (value removed even though the tray menu set it). |
+| Start Menu / desktop | No *HDR Toggle* shortcuts. |
+| `Test-Path "$env:LOCALAPPDATA\hdr_toggle"` | `False` (log folder removed). |
+
 ## Testing the fallback
 
 On a working HDR display the API path is always used, so the fallback has to be tested

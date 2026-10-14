@@ -1,0 +1,59 @@
+name: Release
+
+# Pushing a tag like v0.1.0 builds the installer and publishes it as a GitHub Release.
+# Running the workflow manually only builds the installer and uploads it as an artifact.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          $match = Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
+          $version = $match.Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "tag $env:GITHUB_REF_NAME does not match Cargo.toml version $version (expected v$version)"
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Install Inno Setup
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Get-Command ISCC.exe -ErrorAction SilentlyContinue) -and -not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw "choco install innosetup failed" }
+          }
+
+      - name: Build exe and installer
+        run: .\installer\build.ps1
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdr_toggle-${{ steps.version.outputs.version }}-setup
+          path: installer/Output/hdr_toggle-${{ steps.version.outputs.version }}-setup.exe
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            "installer/Output/hdr_toggle-${{ steps.version.outputs.version }}-setup.exe" `
+            --title "HDR Toggle $env:GITHUB_REF_NAME" `
+            --generate-notes
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
